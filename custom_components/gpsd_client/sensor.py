@@ -128,23 +128,26 @@ class GpsdClient(SensorEntity):
             ATTR_CLIMB: self.climb,
             ATTR_MODE: self.mode_str(),
         }
-
     async def async_update(self) -> None:
         """Grab the latest GPSD data."""
-        self.gpsd_client = GPSDClient(host=self._host, port=self._port)
-        for gps_data in self.gpsd_client.dict_stream(convert_datetime=True):
-            if gps_data["class"] == "TPV":
-                _LOGGER.debug(gps_data)
-                self.lat = gps_data.get("lat", "n/a")
-                self.lon = gps_data.get("lon", "n/a")
-                self.alt = gps_data.get("alt", "n/a")
-                self.time = gps_data.get("time", "n/a")
-                self.speed = gps_data.get("speed", "n/a")
-                self.climb = gps_data.get("climb", "n/a")
-                self.mode = gps_data.get("mode", "n/a")
-                break
-            else:
-                _LOGGER.debug(gps_data)
+        def get_tpv():
+            client = GPSDClient(host=self._host, port=self._port)
+            for gps_data in client.dict_stream(convert_datetime=True):
+                if gps_data["class"] == "TPV":
+                    return gps_data
+            return {}
+    
+        gps_data = await self.hass.async_add_executor_job(get_tpv)
+    
+        if gps_data:
+            _LOGGER.debug(gps_data)
+            self.lat = gps_data.get("lat", "n/a")
+            self.lon = gps_data.get("lon", "n/a")
+            self.alt = gps_data.get("alt", "n/a")
+            self.time = gps_data.get("time", "n/a")
+            self.speed = gps_data.get("speed", "n/a")
+            self.climb = gps_data.get("climb", "n/a")
+            self.mode = gps_data.get("mode", "n/a")
 
     def mode_str(self) -> str:
         """Return the string for the current GPS mode."""
