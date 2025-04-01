@@ -85,12 +85,12 @@ class GpsdClient(SensorEntity):
         self._host = host
         self._port = port
         self._uid = unique_id
-        self.lat = "n/a"
-        self.lon = "n/a"
-        self.alt = "n/a"
-        self.time = "n/a"
-        self.speed = "n/a"
-        self.climb = "n/a"
+        self.lat = None
+        self.lon = None
+        self.alt = None
+        self.time = None
+        self.speed = None
+        self.climb = None
         self.mode = 0
 
     @property
@@ -99,9 +99,9 @@ class GpsdClient(SensorEntity):
         return self._name
 
     @property
-    def native_value(self) -> str:
-        """Return the state of GPSD."""
-        return self.mode_str()
+    def native_value(self) -> int:
+        """Return the state of the sensor (mode as a numeric value)."""
+        return self.mode
 
     @property
     def state_class(self) -> str:
@@ -144,16 +144,17 @@ class GpsdClient(SensorEntity):
                 _LOGGER.warning("Failed to fetch GPSD data: %s", e)
             return {}
 
+        _LOGGER.debug("Calling async_update() for GPSD sensor...")
         gps_data = await self.hass.async_add_executor_job(get_tpv)
 
         if gps_data:
             _LOGGER.debug("Received GPSD data: %s", gps_data)
-            self.lat = gps_data.get("lat", "n/a")
-            self.lon = gps_data.get("lon", "n/a")
-            self.alt = gps_data.get("alt", "n/a")
-            self.time = gps_data.get("time", "n/a")
-            self.speed = gps_data.get("speed", "n/a")
-            self.climb = gps_data.get("climb", "n/a")
+            self.lat = gps_data.get("lat")
+            self.lon = gps_data.get("lon")
+            self.alt = gps_data.get("alt")
+            self.time = gps_data.get("time")
+            self.speed = gps_data.get("speed")
+            self.climb = gps_data.get("climb")
             self.mode = gps_data.get("mode", 0)
 
     def mode_str(self) -> str:
@@ -162,4 +163,6 @@ class GpsdClient(SensorEntity):
             return "3D Fix"
         if self.mode == 2:
             return "2D Fix"
-        return "No Fix"
+        if self.mode == 1:
+            return "No Fix"
+        return "Unknown"
