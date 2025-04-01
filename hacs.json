@@ -4,5 +4,5 @@
     "domains": [
         "sensor"
     ],
-    "homeassistant": "2021.9.0"
+    "homeassistant": "2024.9.0"
 }
