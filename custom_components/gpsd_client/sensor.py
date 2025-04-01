@@ -66,8 +66,10 @@ async def async_setup_platform(
                     unique_id = slugify(f"{path}_{driver}_{subtype}")
                 break
 
+        _LOGGER.info("GPSD Client initialized for host %s:%s", host, port)
+
     except (ConnectionError, EnvironmentError) as e:
-        _LOGGER.warning("Could not connect to GPSD.")
+        _LOGGER.warning("Could not connect to GPSD at %s:%s: %s", host, port, e)
         return False
 
     async_add_entities([GpsdClient(hass, name, host, port, unique_id)])
@@ -128,26 +130,31 @@ class GpsdClient(SensorEntity):
             ATTR_CLIMB: self.climb,
             ATTR_MODE: self.mode_str(),
         }
+
     async def async_update(self) -> None:
         """Grab the latest GPSD data."""
+
         def get_tpv():
-            client = GPSDClient(host=self._host, port=self._port)
-            for gps_data in client.dict_stream(convert_datetime=True):
-                if gps_data["class"] == "TPV":
-                    return gps_data
+            try:
+                client = GPSDClient(host=self._host, port=self._port)
+                for gps_data in client.dict_stream(convert_datetime=True):
+                    if gps_data["class"] == "TPV":
+                        return gps_data
+            except Exception as e:
+                _LOGGER.warning("Failed to fetch GPSD data: %s", e)
             return {}
-    
+
         gps_data = await self.hass.async_add_executor_job(get_tpv)
-    
+
         if gps_data:
-            _LOGGER.debug(gps_data)
+            _LOGGER.debug("Received GPSD data: %s", gps_data)
             self.lat = gps_data.get("lat", "n/a")
             self.lon = gps_data.get("lon", "n/a")
             self.alt = gps_data.get("alt", "n/a")
             self.time = gps_data.get("time", "n/a")
             self.speed = gps_data.get("speed", "n/a")
             self.climb = gps_data.get("climb", "n/a")
-            self.mode = gps_data.get("mode", "n/a")
+            self.mode = gps_data.get("mode", 0)
 
     def mode_str(self) -> str:
         """Return the string for the current GPS mode."""
@@ -155,4 +162,4 @@ class GpsdClient(SensorEntity):
             return "3D Fix"
         if self.mode == 2:
             return "2D Fix"
-        return None
+        return "No Fix"
